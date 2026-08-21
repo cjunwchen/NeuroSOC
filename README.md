@@ -84,7 +84,7 @@ pip install -r requirements.txt
 
 export MOCK_MODE=1                 # deterministic, no proxy needed
 uvicorn app.main:app --reload --port 8020
-# open http://localhost:8020
+
 ```
 
 Drop `MOCK_MODE=1` and set `CALYPSOAI_OPENAI_API_BASE` + `CALYPSOAI_TOKEN` (see
@@ -111,7 +111,6 @@ bash soc-mas/c1/install.sh
 # 2) build + start the shimmed agents and the orchestrator
 docker compose -f docker-compose.yml -f soc-mas/c1/compose.c1.yml up -d --build
 
-# open http://localhost:8020
 ```
 
 The overlay (`soc-mas/c1/compose.c1.yml`) turns `triage` / `threat-intel` /
