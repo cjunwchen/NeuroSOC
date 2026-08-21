@@ -37,8 +37,7 @@ live lab stack** (Keycloak, MCP, Postgres, A2A).
 
 ## What it demonstrates
 
-The lab is a multi-agent SOC incident-response team with four layers of defense
-against a **prompt injextion** that leverage agents as attack surfact 
+This lab simulates a multi-agent SOC incident response framework designed to detect and mitigate **prompt injection** attacks targeting agentic attack surfaces.
 
 ---
 
@@ -97,9 +96,6 @@ The overlay (`soc-mas/c1/compose.c1.yml`) turns `triage` / `threat-intel` /
 ---
 
 ## Operating the stack
-
-> Because two `-f` files are in play, **every** compose command needs the same
-> flags, or Compose only sees the base file and misses the `soc-mas` service.
 
 Set them once per terminal to save typing:
 
