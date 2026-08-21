@@ -198,8 +198,8 @@ the compose network.
 
 | Variable | Default | Used by | Purpose |
 |---|---|---|---|
-| `CALYPSOAI_OPENAI_API_BASE` | — | all (non-mock) | CalypsoAI base URL |
-| `CALYPSOAI_TOKEN` | — | all (non-mock) | CalypsoAI project token |
+| `CALYPSOAI_OPENAI_API_BASE` | — | all (non-mock) | F5 CalypsoAI base URL |
+| `CALYPSOAI_TOKEN` | — | all (non-mock) | F5 CalypsoAI project token |
 | `CALYPSOAI_MODEL` | `gpt-4o-mini` | all | Model name |
 | `MOCK_MODE` | — | `inprocess` | `1` forces the offline mock brain |
 | `KEYCLOAK_ISSUER` | `http://keycloak:8080/realms/agent-lab` | distributed, agents_http (Comms) | Token + introspection issuer |
