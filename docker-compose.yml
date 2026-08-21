@@ -1,0 +1,264 @@
+# =============================================================
+#  agent-security-lab — service wiring (SCAFFOLD)
+# =============================================================
+#  This compose file lays out the topology described in PRD.md §7.
+#  Service images and build contexts are placeholders until the
+#  agent code, MCP server extensions, and Keycloak realm export
+#  are committed.
+#
+#  Topology:
+#    keycloak    — OAuth 2.1 IdP, issues per-agent tokens
+#    postgres    — Sandbox "tickets" DB (the destructive demo target)
+#    mcp-server  — Extended SOC + remediation tools, OAuth-scoped
+#    triage      — Planner agent
+#    threat-intel
+#    remediation — Holds destructive MCP tools
+#    comms       — Slack/email notifications (mocked)
+#    approver    — A2A endpoint that gates destructive actions
+#
+#  All agents call the F5 AI Security (CalypsoAI) OpenAI-compatible
+#  proxy for LLM inference. Each agent passes a unique
+#  x-cai-metadata-session-id so Agentic Fingerprints can show
+#  per-agent chain-of-thought trails.
+# =============================================================
+
+services:
+
+  # ─── IdP ───────────────────────────────────────────────────
+  # Keycloak imports keycloak/realm/agent-lab-realm.json on first
+  # start (only on a fresh keycloak-data volume). To re-import
+  # after editing the realm, `docker compose down -v keycloak`
+  # then `docker compose up -d keycloak`.
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: asl-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-change-me-locally}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm:/opt/keycloak/data/import:ro
+      - keycloak-data:/opt/keycloak/data
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && echo done"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ─── Sandbox DB (the destructive-demo target) ─────────────
+  # Defaults make this work with no .env (so `compose config` and
+  # quick demos don't need configuration). For real lab runs put
+  # values in .env to override.
+  postgres:
+    image: postgres:16-alpine
+    container_name: asl-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-tickets}
+      - POSTGRES_USER=${POSTGRES_USER:-lab}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-locally}
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lab} -d ${POSTGRES_DB:-tickets}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── MCP Server (SOC tools + remediation tools) ───────────
+  # Module 0.5 shipped only the SOC investigation tools.
+  # Module 1 Slice A adds the destructive `execute_db_query`
+  # plus mocked host/credential controls — and the Postgres
+  # dependency to back them. Still no auth; that's the bug
+  # Module 1 Slice B fixes via OAuth introspection.
+  mcp-server:
+    build:
+      context: ./mcp_server
+    container_name: asl-mcp-server
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-tickets}
+      - POSTGRES_USER=${POSTGRES_USER:-lab}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-change-me-locally}
+      # OAuth (Slice B). When KEYCLOAK_ISSUER is set the AuthMiddleware
+      # demands a valid bearer token and uses MCP_OAUTH_CLIENT_*
+      # to call the introspection endpoint. Set MCP_SKIP_AUTH=1 to
+      # disable auth for Slice A demos.
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - MCP_OAUTH_CLIENT_ID=${MCP_OAUTH_CLIENT_ID:-mcp-server}
+      - MCP_OAUTH_CLIENT_SECRET=${MCP_OAUTH_CLIENT_SECRET:-mcp-server-secret-change-me}
+      - MCP_SKIP_AUTH=${MCP_SKIP_AUTH:-}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Agents ────────────────────────────────────────────────
+  # All agents share the same shape: route LLM calls through the
+  # CalypsoAI proxy with a per-agent session ID; authenticate to
+  # MCP / A2A endpoints with Keycloak-issued tokens.
+
+  # ─── Agents ────────────────────────────────────────────────
+  # All agents inject `.env` directly via `env_file:` instead of
+  # interpolating ${VAR} into the `environment:` block. Reason:
+  # `${VAR}` interpolation reads the SHELL env first and falls
+  # back to .env, so a stale `set -a; source .env` from earlier
+  # in the session silently wins over an updated .env. Using
+  # `env_file:` reads the file at container start every time.
+  # Per-service overrides (AGENT_NAME, MCP/A2A URLs) stay in
+  # `environment:` because they are intrinsic to the service,
+  # not learner config.
+
+  # Triage has no tools (planner only) — no MCP, no DB, no OAuth.
+  # That makes it the right vertical-slice target: it isolates the
+  # CalypsoAI BYOA wiring from every other dependency.
+  # Run with: `docker compose run --rm triage`
+  triage:
+    build:
+      context: ./agents/triage
+    container_name: asl-triage
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AGENT_NAME=triage
+      # ALERT_TEXT is an intentional per-run override: setting it in the
+      # caller's shell is the natural way to swap in a poisoned alert
+      # (Module 1) without editing .env. Interpolating it here is safe —
+      # the failure mode is "you forgot you exported it", not the silent
+      # stale-config problem we hit with the CalypsoAI vars.
+      - ALERT_TEXT=${ALERT_TEXT:-}
+      # Module 3 — A2A. When COMMS_A2A_URL is set Triage will dispatch
+      # any comms tasks in its plan to the Comms agent over HTTP. The
+      # OAuth token identifies us; the receiver's agent card decides.
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${TRIAGE_OAUTH_CLIENT_ID:-agent-triage}
+      - OAUTH_CLIENT_SECRET=${TRIAGE_OAUTH_CLIENT_SECRET:-agent-triage-secret-change-me}
+      - COMMS_A2A_URL=http://comms:9100
+    depends_on:
+      comms:
+        condition: service_healthy
+    restart: "no"
+
+  # Threat-Intel uses the MCP server's SOC tools through the
+  # OpenAI tool-calling protocol (see agents/threat_intel/agent.py).
+  # Module 2 adds OAuth (mcp:read scope) plus per-agent capability
+  # filtering on the MCP server: Threat-Intel sees ONLY the SOC
+  # investigation tools — execute_db_query and friends do not appear
+  # in its menu at all.
+  # Run with: `docker compose run --rm threat-intel`
+  # Override the task with: `-e TASK_DESCRIPTION="..."`
+  threat-intel:
+    build:
+      context: ./agents/threat_intel
+    container_name: asl-threat-intel
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AGENT_NAME=threat-intel
+      - MCP_SERVER_URL=http://mcp-server:8000/sse
+      - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${THREAT_INTEL_OAUTH_CLIENT_ID:-agent-threat-intel}
+      - OAUTH_CLIENT_SECRET=${THREAT_INTEL_OAUTH_CLIENT_SECRET:-agent-threat-intel-secret-change-me}
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    restart: "no"
+
+  # Remediation has the destructive tools (execute_db_query,
+  # quarantine_host, revoke_credential). In Slice A the MCP
+  # server enforces NO scope checks — feeding a poisoned task
+  # really drops the tickets table. Module 1 Slice B will add
+  # OAuth-scoped tokens; Module 3 will add the Approver gate.
+  # Run with: `docker compose run --rm remediation`
+  # Override the task with: `-e TASK_DESCRIPTION="..."`
+  remediation:
+    build:
+      context: ./agents/remediation
+    container_name: asl-remediation
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AGENT_NAME=remediation
+      - MCP_SERVER_URL=http://mcp-server:8000/sse
+      - TASK_DESCRIPTION=${TASK_DESCRIPTION:-}
+      # OAuth (Slice B). Setting KEYCLOAK_ISSUER tells the agent to
+      # fetch a client_credentials token before connecting to MCP.
+      # Unset to skip OAuth (only useful with MCP_SKIP_AUTH=1 on the
+      # mcp-server).
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - OAUTH_CLIENT_ID=${REMEDIATION_OAUTH_CLIENT_ID:-agent-remediation}
+      - OAUTH_CLIENT_SECRET=${REMEDIATION_OAUTH_CLIENT_SECRET:-agent-remediation-secret-change-me}
+    depends_on:
+      mcp-server:
+        condition: service_healthy
+    restart: "no"
+
+  # Comms is the first A2A receiver. It speaks HTTP, publishes its
+  # agent card at /.well-known/agent.json, and (when COMMS_ENFORCE_CARD=1)
+  # rejects calls whose OAuth client id is not in the per-skill
+  # allowed_callers list. Slice A toggles enforcement off to
+  # reproduce the failure mode; Slice B turns it on.
+  comms:
+    build:
+      context: ./agents/comms
+    container_name: asl-comms
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      - COMMS_OAUTH_CLIENT_ID=${COMMS_OAUTH_CLIENT_ID:-agent-comms}
+      - COMMS_OAUTH_CLIENT_SECRET=${COMMS_OAUTH_CLIENT_SECRET:-agent-comms-secret-change-me}
+      - COMMS_ENFORCE_CARD=${COMMS_ENFORCE_CARD:-}
+      - COMMS_PORT=9100
+    ports:
+      - "9100:9100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9100/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
+
+  approver:
+    build:
+      context: ./agents/approver
+    container_name: asl-approver
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - AGENT_NAME=approver
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
+
+volumes:
+  keycloak-data:
+    driver: local
+  postgres-data:
+    driver: local

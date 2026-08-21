@@ -1,0 +1,14 @@
+# MCP Server — dependencies
+# ────────────────────────────────────────────────────────────
+# mcp[cli]   The official MCP SDK (FastMCP, protocol handlers,
+#            SSE transport). [cli] pulls in the dev extras.
+# httpx      Async HTTP client used by lookup_ip_geolocation.
+# uvicorn    ASGI server FastMCP uses to expose the SSE
+#            transport over HTTP.
+# ────────────────────────────────────────────────────────────
+mcp[cli]>=1.3.0,<2.0
+httpx>=0.27.0
+uvicorn>=0.30.0
+# asyncpg powers the execute_db_query tool added in Module 1 Slice A.
+# pinned at >=0.29 for Python 3.11 compatibility.
+asyncpg>=0.29.0

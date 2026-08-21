@@ -1,0 +1,111 @@
+{
+  "realm": "agent-lab",
+  "enabled": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+
+  "clientScopes": [
+    {
+      "name": "mcp:read",
+      "description": "Read-only SOC tools and SELECT against the operational DB.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "mcp:write",
+      "description": "Mutating but non-destructive: UPDATE/INSERT/DELETE rows, mocked host/credential controls.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "mcp:admin",
+      "description": "Destructive DDL: DROP / CREATE / ALTER / TRUNCATE. Reserve for break-glass scenarios.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    }
+  ],
+
+  "clients": [
+    {
+      "clientId": "mcp-server",
+      "name": "MCP Server (resource server)",
+      "description": "The MCP server uses this client's secret to call Keycloak's token-introspection endpoint when validating bearer tokens from agents.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "mcp-server-secret-change-me",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false
+    },
+    {
+      "clientId": "agent-remediation",
+      "name": "Remediation agent",
+      "description": "Service-account client used by the Remediation agent. Granted mcp:read + mcp:write at the realm; deliberately NOT granted mcp:admin so the destructive demo fails when the agent tries DROP TABLE.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-remediation-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": ["mcp:read", "mcp:write"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-threat-intel",
+      "name": "Threat-Intel agent",
+      "description": "Service-account client for the Threat-Intel agent. mcp:read only at the OAuth layer; capabilities.json restricts it to the SOC investigation tools.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-threat-intel-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": ["mcp:read"],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-triage",
+      "name": "Triage agent",
+      "description": "Service-account client for the Triage planner. Used to call other agents over A2A; identity-based authorization is enforced by each receiver's agent-card.json.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-triage-secret-change-me",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "agent-comms",
+      "name": "Comms agent (resource server)",
+      "description": "Comms uses this client's secret to call Keycloak's introspection endpoint when validating bearer tokens from incoming A2A calls.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "agent-comms-secret-change-me",
+      "serviceAccountsEnabled": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false
+    }
+  ]
+}

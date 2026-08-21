@@ -1,0 +1,85 @@
+# ── Option C1 overlay ────────────────────────────────────────────────────────
+# Turns the three batch agents into long-running HTTP services (via the shim,
+# installed by ./soc-mas/c1/install.sh) and adds the soc-mas orchestrator.
+#
+#   ./soc-mas/c1/install.sh
+#   docker compose -f docker-compose.yml -f soc-mas/c1/compose.c1.yml up -d --build
+#   open http://localhost:8020
+#
+# Paths are resolved from the lab repo root (the first -f file's directory).
+services:
+  # The stock docker-compose.yml declares an `approver` service that builds from
+  # ./agents/approver — a directory that isn't in the repo, so a bare
+  # `up --build` fails trying to build it. We don't need it (notify-external
+  # stays denied without an approver token), so park it in an unused profile:
+  # `up` then skips it entirely (no build, no run). Enable later with
+  # `--profile approver` once agents/approver exists.
+  approver:
+    profiles: ["approver"]
+
+  triage:
+    environment:
+      - AGENT_KIND=planner
+    ports:
+      - "9201:9200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9200/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  threat-intel:
+    environment:
+      - AGENT_KIND=tool
+    ports:
+      - "9202:9200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9200/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  remediation:
+    environment:
+      - AGENT_KIND=tool
+    ports:
+      - "9203:9200"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9200/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  soc-mas:
+    build:
+      context: ./soc-mas
+    container_name: asl-soc-mas
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - BACKEND=agents_http
+      - TRIAGE_URL=http://triage:9200
+      - THREAT_INTEL_URL=http://threat-intel:9200
+      - REMEDIATION_URL=http://remediation:9200
+      - COMMS_A2A_URL=http://comms:9100
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/${KEYCLOAK_REALM:-agent-lab}
+      # CALYPSOAI_* + any *_OAUTH_CLIENT_SECRET overrides come from .env
+    ports:
+      - "8020:8020"
+    depends_on:
+      triage:
+        condition: service_healthy
+      threat-intel:
+        condition: service_healthy
+      remediation:
+        condition: service_healthy
+      comms:
+        condition: service_healthy
+    restart: unless-stopped

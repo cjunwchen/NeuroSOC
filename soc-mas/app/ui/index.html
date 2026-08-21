@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SOC IR Multi-Agent Demo</title>
+    <link rel="stylesheet" href="/ui-static/styles.css?v=2" />
+  </head>
+  <body>
+    <div class="bg shape-a"></div>
+    <div class="bg shape-b"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="live-dot" aria-hidden="true"></span>
+        <div>
+          <h1>SOC IR Multi-Agent</h1>
+          <p>Watch an alert move through Triage, specialist agents, tools, and guardrails in real time.</p>
+        </div>
+      </div>
+      <div class="meta">
+        <span id="modeBadge" class="chip mode">…</span>
+        <span class="chip"><span class="chip-k">Trace</span><code id="traceId">—</code></span>
+        <span id="guardrailChip" class="chip guardrail g-idle">
+          <span class="gdot" aria-hidden="true"></span><span id="guardrailText">idle</span>
+        </span>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- Alert intake -->
+      <section class="panel intake">
+        <div class="panel-head"><div><h2>Alert intake</h2><p>Pick a scenario, then dispatch the SOC team.</p></div></div>
+        <div id="scenarioList" class="scenarios"></div>
+        <label for="alertText">Security alert</label>
+        <textarea id="alertText" rows="7" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="runBtn" type="button">Run incident response</button>
+          <button id="resetBtn" type="button" class="ghost">Clear</button>
+        </div>
+        <div class="legend">
+          <div class="legend-title">What blocks what</div>
+          <ul>
+            <li><span class="pill scope">scope</span> OAuth scope per action — DROP needs <code>mcp:admin</code>, which Remediation lacks.</li>
+            <li><span class="pill cap">capability</span> per-agent tool manifest — agents can't call ungranted tools.</li>
+            <li><span class="pill card">A2A card</span> Comms <code>notify-external</code> only accepts an attested Approver.</li>
+            <li><span class="pill guard">guardrail</span> F5 AI Guardrails can block a poisoned prompt at the proxy (live mode).</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- System flow -->
+      <section class="panel flow">
+        <div class="panel-head">
+          <div><h2>System flow</h2><p>Real-time visualization of agent orchestration and tool execution.</p></div>
+        </div>
+
+        <div id="runProgress" class="run-progress"></div>
+
+        <div class="topo-controls">
+          <button id="zoomOut" class="icon-btn" type="button" aria-label="Zoom out">−</button>
+          <span id="zoomLabel" class="zoom-label">90%</span>
+          <button id="zoomIn" class="icon-btn" type="button" aria-label="Zoom in">+</button>
+          <button id="zoomReset" class="mini" type="button">Reset</button>
+          <span class="spacer"></span>
+          <button id="toggleRedTeam" class="mini redteam" type="button">Show Red Team</button>
+          <button id="toggleGuardrail" class="mini on" type="button">Hide Guardrail</button>
+        </div>
+
+        <div id="topoStage" class="topo-stage">
+          <div id="topoCanvas" class="topo-canvas">
+            <div id="topoScene" class="topo-scene">
+              <svg id="topoSvg" viewBox="0 0 1440 760" preserveAspectRatio="none" aria-hidden="true">
+                <defs>
+                  <marker id="arrow" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#5a7ea0"></path>
+                  </marker>
+                  <marker id="arrowRed" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+                    <path d="M0,0 L10,4 L0,8 z" fill="#ff6b6b"></path>
+                  </marker>
+                </defs>
+              </svg>
+              <div id="topoNodes"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="inspector" class="inspector">
+          <div class="insp-body"><div class="insp-empty">Click any node to inspect its output.</div></div>
+        </div>
+
+        <details class="logwrap"><summary>Execution log</summary><ol id="log" class="log"></ol></details>
+      </section>
+    </main>
+
+    <script src="/ui-static/app.js?v=2"></script>
+  </body>
+</html>
