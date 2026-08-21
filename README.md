@@ -159,6 +159,8 @@ Without `COMPOSE_FILE`, prefix each with
 
 ## Using the UI
 
+![NeuroSOC UI](<images/UI sampple.jpg>)
+
 - **Left panel** — pick a scenario (or paste an alert) and click **Run incident
   response**.
 - **Progress strip** — advances Alert → Triage → Agent Execution → Tool Calls →
