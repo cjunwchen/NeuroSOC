@@ -268,21 +268,6 @@ one-shot form (they exit instead of serving on :9200). Run
 `docker logs asl-triage` — you want uvicorn on :9200, not "python agent.py …
 exited".
 
-**No denials appear in the poisoned run**
-The stack is on Slice A (auth off). Enable enforcement: `mcp-server` with
-`MCP_SKIP_AUTH` unset + capability manifest on, `comms` with
-`COMMS_ENFORCE_CARD=1`.
-
-**A run errors on a specific agent**
-The UI shows an error line for that agent. Most likely a Keycloak `401` on token
-fetch (client-secret mismatch — check the `*_OAUTH_CLIENT_SECRET` values) or an
-MCP SSE handshake error (`MCP_SERVER_URL` / mcp-server health). `docker compose
-logs -f <service>` has the detail.
-
-**`notify-external` succeeds instead of being denied**
-Enforcement is off, or an Approver token path was added. By design it stays
-denied (blocked egress) unless the Approver flow is wired.
-
 ---
 
 ## Validation & honest caveats
