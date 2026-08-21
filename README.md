@@ -94,13 +94,13 @@ reads **MOCK MODE** or **LIVE · \<model\>** so you always know which path you'r
 
 ### B. Wire to the real lab stack
 
-Here the three agents become real HTTP services and soc-mas is only an
-orchestrator: it fires a task at each agent service and relays the stream. The
-agent containers do the real Keycloak/MCP/Postgres work; Comms is called over
-real A2A. **`agent.py` is never modified** — a small shim wraps it.
+the three agents operate as standalone HTTP microservices, while soc-mas serves 
+strictly as the orchestrator—dispatching tasks to each service and relaying event 
+streams. The agent containers execute backend workloads (Keycloak authentication, 
+MCP tool calls, and PostgreSQL transactions), while inter-agent coordination runs 
+over native Agent-to-Agent (A2A) protocols.
 
-**Prerequisites:** the agent-security-lab stack builds and runs, and your
-CalypsoAI proxy creds are in the lab's `.env`.
+**Prerequisites:** CalypsoAI proxy creds are in the lab's `.env`.
 
 ```bash
 # from the NeuroSOC repo root, with this soc-mas/ folder unzipped there:
@@ -117,11 +117,7 @@ docker compose -f docker-compose.yml -f soc-mas/c1/compose.c1.yml up -d --build
 The overlay (`soc-mas/c1/compose.c1.yml`) turns `triage` / `threat-intel` /
 `remediation` into services (host ports 9201/9202/9203 → 9200) and adds the
 `soc-mas` orchestrator on `:8020`. It reads the lab's `.env`, so your
-`CALYPSOAI_*` creds and any `*_OAUTH_CLIENT_SECRET` overrides carry over.
-
-> **For the denials to actually fire, keep the stack enforced:** `mcp-server`
-> with `MCP_SKIP_AUTH` unset and the capability manifest active, and `comms`
-> with `COMMS_ENFORCE_CARD=1`. On Slice A (auth off) nothing denies — expected.
+`CALYPSOAI_*` creds overrides carry over.
 
 ---
 
@@ -188,6 +184,8 @@ Without `COMPOSE_FILE`, prefix each with
   OAuth scope blocks the DROP; the A2A card blocks the egress — layer by layer.
   (In live mode with prompt-injection scanners on, Triage may also be blocked at
   the proxy.)
+
+> More to be added.
 
 ---
 
