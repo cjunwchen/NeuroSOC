@@ -239,7 +239,7 @@ identical across all three modes. That SSE contract is the seam that lets the
 enforcement move from "simulated in Python" to "real, in your containers"
 without touching a line of UI.
 
-In **C1**, each agent's shim runs `agent.py`'s exact loop — same system prompt,
+Each agent's shim runs `agent.py`'s exact loop — same system prompt,
 same Keycloak `client_credentials` token, same MCP SSE session, same tool
 calls — and emits structured events instead of printing. The orchestrator POSTs
 a task to each agent's `/run` endpoint, relays the events, and calls Comms over
