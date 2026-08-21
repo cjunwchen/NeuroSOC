@@ -19,6 +19,7 @@ live lab stack** (Keycloak, MCP, Postgres, A2A).
 ## Contents
 
 - [What it demonstrates](#what-it-demonstrates)
+- [Project layout](#project-layout)
 - [Quick start](#quick-start)
   - [A. Standalone demo (no backend)](#a-standalone-demo-no-backend)
   - [B. Wire to the real lab stack](#b-wire-to-the-real-lab-stack-option-c1)
@@ -27,7 +28,6 @@ live lab stack** (Keycloak, MCP, Postgres, A2A).
 - [Scenarios](#scenarios)
 - [Configuration reference](#configuration-reference)
 - [Ports](#ports)
-- [Project layout](#project-layout)
 - [How it works](#how-it-works)
 - [Troubleshooting](#troubleshooting)
 - [Validation & honest caveats](#validation--honest-caveats)
@@ -38,6 +38,36 @@ live lab stack** (Keycloak, MCP, Postgres, A2A).
 ## What it demonstrates
 
 This lab simulates a multi-agent SOC incident response framework designed to detect and mitigate **prompt injection** attacks targeting agentic attack surfaces.
+
+---
+
+## Project layout
+
+```
+NeuroSOC/
+├── PRD.md                  ← Full design doc
+├── README.md               ← You are here
+├── SETUP.md                ← Environment build for self-paced learners and instructors
+├── docs/
+│   ├── STUDENT_GUIDE.md    ← Module-by-module walkthrough with concept primers
+│   └── INSTRUCTOR_GUIDE.md ← Per-module instructor notes (filling in as modules ship)
+├── docker-compose.yml      ← Service wiring (Keycloak, Postgres, MCP server, agents)
+├── scripts/
+│   └── setup-ubuntu-22.sh  ← Idempotent lab-node bootstrap
+├── agents/
+│   ├── triage/             ← Module 0 vertical slice (planner; no tools)
+│   ├── threat_intel/       ← (TBD)
+│   ├── remediation/        ← (TBD)
+│   ├── comms/              ← (TBD)
+│   └── approver/           ← (TBD)
+├── mcp_server/             ← Extended SOC + remediation MCP server (TBD)
+├── keycloak/               ← Realm export, per-agent clients & scopes (TBD)
+├── a2a/                    ← Agent cards, signing keys (TBD)
+├── soc-mas/                ← UI orchestrator
+├── policies/               ← CalypsoAI session/policy templates per module (TBD)
+└── .gitignore
+
+```
 
 ---
 
@@ -73,7 +103,7 @@ real A2A. **`agent.py` is never modified** — a small shim wraps it.
 CalypsoAI proxy creds are in the lab's `.env`.
 
 ```bash
-# from the agent-security-lab repo root, with this soc-mas/ folder unzipped there:
+# from the NeuroSOC repo root, with this soc-mas/ folder unzipped there:
 
 # 1) layer the shim onto the three agents (backs up each Dockerfile to Dockerfile.orig)
 bash soc-mas/c1/install.sh
@@ -196,33 +226,6 @@ the compose network.
 | keycloak | `8080` | IdP |
 | postgres | — | internal only |
 | approver | `9000` | disabled by default (see Troubleshooting) |
-
----
-
-## Project layout
-
-```
-soc-mas/
-├── app/
-│   ├── main.py          FastAPI app: UI, /health, /api/scenarios, /api/run/stream (SSE)
-│   ├── config.py        settings + backend/mode selection + endpoints/creds
-│   ├── workflow.py      orchestrator: Triage → specialists → Comms; picks backend
-│   ├── agents.py        in-process agents: exact lab prompts + mock brain
-│   ├── soc_tools.py     in-process SOC toolkit + scope/capability rules
-│   ├── distributed.py   BACKEND=distributed: real Keycloak/MCP/A2A from the orchestrator
-│   ├── agents_http.py   BACKEND=agents_http (C1): POST to agent services, relay their SSE
-│   ├── scenarios.py     the two canned alerts
-│   └── ui/              single-page UI (index.html + static/app.js + static/styles.css)
-├── c1/                  run the real agent containers
-│   ├── shim.py          HTTP+SSE wrapper around the unmodified agent.py (planner/tool)
-│   ├── Dockerfile.shim  agent image + fastapi/uvicorn, runs the shim on :9200
-│   ├── install.sh       layer the shim onto the 3 agents (agent.py untouched)
-│   ├── uninstall.sh     revert the agents to stock batch form
-│   └── compose.c1.yml   overlay: agents→services + soc-mas orchestrator
-├── Dockerfile           orchestrator image
-├── requirements.txt
-└── .env.example
-```
 
 ---
 
